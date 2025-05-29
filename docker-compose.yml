@@ -1,0 +1,38 @@
+services:
+
+  backend:
+    build: ./back-end
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/chatdb
+      - SPRING_DEVTOOLS_RESTART_ENABLED=true
+    volumes:
+      - ./back-end:/app
+    working_dir: /app
+    command: ./gradlew bootRun
+    depends_on:
+      - mongo
+
+  frontend:
+    build: ./front-end
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./front-end:/app
+      - /app/node_modules
+    working_dir: /app
+    command: npm run dev
+    depends_on:
+      - backend
+
+  mongo:
+    image: mongo:latest
+    container_name: chat-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:
