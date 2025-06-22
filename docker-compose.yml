@@ -14,18 +14,6 @@ services:
     depends_on:
       - mongo
 
-  frontend:
-    build: ./front-end
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./front-end:/app
-      - /app/node_modules
-    working_dir: /app
-    command: npm run dev
-    depends_on:
-      - backend
-
   mongo:
     image: mongo:latest
     container_name: chat-mongo

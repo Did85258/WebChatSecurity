@@ -3,6 +3,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import SockJS from 'sockjs-client';
 import { CompatClient, Stomp } from '@stomp/stompjs';
+import { useUser } from '../../components/context/UserContext';
+import Swal from 'sweetalert2';
+import 'sweetalert2/src/sweetalert2.scss';
 
 type ChatMessage = {
   sender: string;
@@ -10,17 +13,59 @@ type ChatMessage = {
   content: string;
   timestamp?: string;
 };
-
+const BASE_URL = "http://localhost:8080";
 const ChatPage = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [username, setUsername] = useState('user' + Math.floor(Math.random() * 1000));
   const stompClientRef = useRef<CompatClient | null>(null);
+  // const { user } = useUser();
+
+
+  // const navigate = useRouter();
+  const personalData = async () => {
+    try {
+      const response  = await fetch(`${BASE_URL}/auth/personal`, {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await response.json();
+      console.log(data)
+      setUser(data.username)
+
+    } catch (error) {
+      // console.error("Error:", error);
+      Swal.fire({
+        title: "Error!",
+        text: "Failed to login.",
+        icon: "error",
+        confirmButtonText: "OK",
+        // confirmButtonColor: "#d33",
+      });
+    }
+  };
+
+  const { user, setUser } = useUser();
+
+  // useEffect(() => {
+  //   personalData().then((data) => {
+  //     console.log("📦 Data from personalData():", data);
+  //     console.log("👤 Context user:", user); // <== ใช้ได้ตรงนี้
+  //   });
+  // }, [user]); // หรือ [] ถ้าไม่ต้องการ rerun
 
   useEffect(() => {
+    // console.log("asdwda:"+user)
+    personalData()
+    // setUser()
     const socket = new SockJS('http://localhost:8080/ws');
     const stompClient = Stomp.over(socket);
     stompClientRef.current = stompClient;
+
+    
 
     stompClient.connect({}, () => {
       stompClient.subscribe('/topic/messages/' + 'test', (message) => {

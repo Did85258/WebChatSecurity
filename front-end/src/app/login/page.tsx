@@ -1,9 +1,12 @@
-'use client';
+"use client";
 import { useEffect, useState } from "react";
-import { useRouter } from 'next/navigation';
+import { useRouter } from "next/navigation";
 import Swal from "sweetalert2";
+import { Button } from "antd";
+import { DownloadOutlined } from "@ant-design/icons";
 
-const BASE_URL = "http://127.0.0.1:8000";
+// const BASE_URL = "http://127.0.0.1:8000";
+const BASE_URL = "http://localhost:8080";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -11,22 +14,12 @@ export default function Login() {
   const [error, setError] = useState("");
   const navigate = useRouter();
 
-  useEffect(() => {
-    const token = localStorage.getItem("employeeToken");
-    const token2 = localStorage.getItem("userToken");
-    if (token) {
-      navigate.push("/employee/home");
-    }
-    if (token2) {
-      navigate.push("/home");
-    }
-  }, [navigate]);
-
-  const Login = async (e:any) => {
+  const Login = async (e: any) => {
     e.preventDefault();
     try {
       const response = await fetch(`${BASE_URL}/auth/login`, {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
@@ -34,37 +27,17 @@ export default function Login() {
       });
 
       if (!response.ok) {
-        throw new Error("Network response was not ok");
-      }
-
-      const data = await response.json();
-
-      if (data.access_token) {
-        localStorage.setItem("userToken", data.access_token);
-        localStorage.setItem("userId", data.user_id);
-        localStorage.setItem("userName", data.username);
-        setError("");
-        navigate.push("/home");
-        Swal.fire({
-          title: "Success!",
-          text: "Login successful.",
-          icon: "success",
-          confirmButtonText: "OK",
-          confirmButtonColor: "#28a745",
-        }).then((result:any) => {
-          if (result.isConfirmed) {
-            window.location.reload();
-          }
-        });
-      } else {
-        setError("No token received");
+        const data = await response.json();
+        setError(data.message || "Login failed");
         Swal.fire({
           title: "Error!",
-          text: "No token received.",
+          text: "Network response was not ok",
           icon: "error",
           confirmButtonText: "OK",
-          confirmButtonColor: "#d33",
+          // confirmButtonColor: "#d33",
         });
+      } else {
+        navigate.push("/chats");
       }
     } catch (error) {
       console.error("Error:", error);
@@ -74,17 +47,17 @@ export default function Login() {
         text: "Failed to login.",
         icon: "error",
         confirmButtonText: "OK",
-        confirmButtonColor: "#d33",
+        // confirmButtonColor: "#d33",
       });
     }
   };
 
-  const handleUsernameChange = (event:any) => {
-    setUsername(event.target.value);
+  const handleUsernameChange = (event: any) => {
+    setUsername(event.target.value.trim());
   };
 
-  const handlePasswordChange = (event:any) => {
-    setPassword(event.target.value);
+  const handlePasswordChange = (event: any) => {
+    setPassword(event.target.value.trim());
   };
 
   const handleRegisterClick = () => {
@@ -93,9 +66,9 @@ export default function Login() {
   return (
     <>
       <section className="bg-slate-700 w-screen h-screen">
-        <div className="min-h-screen flex items-center justify-center w-full dark:bg-gray-950">
+        <div className="min-h-screen flex items-center justify-center w-full ">
           <div className="bg-white dark:bg-gray-900 shadow-md rounded-lg px-8 py-6 w-96">
-            <h1 className="text-2xl font-bold text-center mb-4 dark:text-gray-200">
+            <h1 className="text-2xl font-bold text-center mb-4 0">
               Login
             </h1>
             <form action="#" onSubmit={Login}>
@@ -139,12 +112,15 @@ export default function Login() {
                   Create Account
                 </a>
               </div>
+
               <button
-                //   onClick="alert('hello')"
+
                 type="submit"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="cursor-pointer w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                Login
+                <div className="text-white">Login</div>
+                
+                
               </button>
             </form>
           </div>

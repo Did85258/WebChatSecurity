@@ -2,14 +2,18 @@ package webchat.back_end.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import webchat.back_end.dto.LoginRequestDTO;
 import webchat.back_end.dto.RegisterRequestDTO;
+import webchat.back_end.dto.UserResponseDTO;
 import webchat.back_end.entity.User;
 import webchat.back_end.exception.UserAlreadyExistsException;
 import webchat.back_end.exception.WrongUserPasswordException;
 import webchat.back_end.repository.UserRepository;
+
+import java.time.Duration;
 
 
 @Service
@@ -22,7 +26,7 @@ public class AuthService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    public String register(RegisterRequestDTO req_regis) {
+    public void register(RegisterRequestDTO req_regis) {
         if (userRepository.findByUsername(req_regis.getUsername()).isPresent()) {
             throw new UserAlreadyExistsException("Username already exists");
         }
@@ -32,20 +36,32 @@ public class AuthService {
                 .role("USER")
                 .build();
         userRepository.save(genUser);
-        return jwtService.generateToken(req_regis.getUsername());
     }
 
-    public String login(LoginRequestDTO req_login) {
-        System.out.println(userRepository.findByUsername(req_login.getUsername()));
+    public String loginToken(LoginRequestDTO req_login) {
+//        System.out.println(userRepository.findByUsername(req_login.getUsername()));
+        String username = req_login.getUsername().trim();
+        String password = req_login.getPassword().trim();
         User f_user = userRepository
-                .findByUsername(req_login.getUsername())
+                .findByUsername(username)
                 .orElseThrow(() ->
                         new WrongUserPasswordException("User or Password is incorrect"));
-        if (!passwordEncoder.matches(req_login.getPassword(), f_user.getPassword())) {
+        if (!passwordEncoder.matches(password, f_user.getPassword())) {
             throw new WrongUserPasswordException("User or Password is incorrect");
         }
 
-        return jwtService.generateToken(f_user.getUsername());
+        return jwtService.generateToken(username);
+    }
+
+    public UserResponseDTO findByUserId(String id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        UserResponseDTO userRes = new UserResponseDTO();
+        userRes.setUser_id(user.getId());
+        userRes.setUsername(user.getUsername());
+        userRes.setRole(user.getRole());
+
+        return userRes;
     }
 }
 
