@@ -19,7 +19,7 @@ export default function Navbar() {
   const [username, setUsername] = useState<any | null>(null);
 
   useEffect(() => {
-    setUsername(user);
+    setUsername(user?.username);
   }, [user]);
 
   const [open, setOpen] = useState(false);

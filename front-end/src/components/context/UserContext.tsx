@@ -4,8 +4,8 @@ import { createContext, useState, useContext, useEffect, ReactNode } from "react
 
 type User = {
   username: string;
-  email: string;
-  role?: string;
+  user_id: string;
+  role: string;
 };
 
 type UserContextType = {
@@ -34,3 +34,5 @@ export const useUser = () => {
   if (!context) throw new Error("useUser must be used within a UserProvider");
   return context;
 };
+
+

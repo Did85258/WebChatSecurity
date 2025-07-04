@@ -21,5 +21,8 @@ public class ChatMessage {
     private String sender;
     private String receiver;
     private String content;
+    private String encryptedContent;
+    private String type_content;
     private Instant timestamp; // ใช้ Instant ดีกว่า Date
+
 }

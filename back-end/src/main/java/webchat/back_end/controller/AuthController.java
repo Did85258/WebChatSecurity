@@ -8,16 +8,16 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import webchat.back_end.dto.LoginRequestDTO;
-import webchat.back_end.dto.RegisterRequestDTO;
+import webchat.back_end.dto.auth.LoginRequestDTO;
+import webchat.back_end.dto.auth.RegisterRequestDTO;
 
-import webchat.back_end.dto.UserResponseDTO;
-import webchat.back_end.entity.User;
+import webchat.back_end.dto.auth.UserResponseDTO;
 import webchat.back_end.service.AuthService;
 import webchat.back_end.service.JWTService;
 
+import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
-import java.util.Map;
 
 
 @RestController
@@ -31,7 +31,7 @@ public class AuthController {
     private JWTService jwtService;
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequestDTO req) {
+    public ResponseEntity<?> register(@RequestBody RegisterRequestDTO req) throws IOException, NoSuchAlgorithmException {
         try {
             authService.register(req);
             return ResponseEntity.ok("Register Success");

@@ -2,18 +2,19 @@ package webchat.back_end.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import webchat.back_end.dto.LoginRequestDTO;
-import webchat.back_end.dto.RegisterRequestDTO;
-import webchat.back_end.dto.UserResponseDTO;
+import webchat.back_end.dto.auth.LoginRequestDTO;
+import webchat.back_end.dto.auth.RegisterRequestDTO;
+import webchat.back_end.dto.auth.UserResponseDTO;
 import webchat.back_end.entity.User;
 import webchat.back_end.exception.UserAlreadyExistsException;
 import webchat.back_end.exception.WrongUserPasswordException;
 import webchat.back_end.repository.UserRepository;
 
-import java.time.Duration;
+import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 
 
 @Service
@@ -25,17 +26,29 @@ public class AuthService {
     private JWTService jwtService;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private RSAService rsaService;
 
-    public void register(RegisterRequestDTO req_regis) {
+    public void register(RegisterRequestDTO req_regis) throws IOException, NoSuchAlgorithmException {
         if (userRepository.findByUsername(req_regis.getUsername()).isPresent()) {
             throw new UserAlreadyExistsException("Username already exists");
         }
+
+
         User genUser = User.builder()
                 .username(req_regis.getUsername())
                 .password(passwordEncoder.encode(req_regis.getPassword()))
                 .role("USER")
+
                 .build();
         userRepository.save(genUser);
+        User user = userRepository.findByUsername(req_regis.getUsername())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        byte[] publicKey = rsaService.generateRSAKey(user.getId());
+
+
+            user.setPublicKey(publicKey);
+            userRepository.save(user);
     }
 
     public String loginToken(LoginRequestDTO req_login) {

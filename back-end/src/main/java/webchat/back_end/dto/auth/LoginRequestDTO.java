@@ -1,4 +1,4 @@
-package webchat.back_end.dto;
+package webchat.back_end.dto.auth;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;

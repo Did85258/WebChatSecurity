@@ -1,4 +1,4 @@
-package webchat.back_end.dto;
+package webchat.back_end.dto.auth;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -8,7 +8,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class UserResponseDTO {
-    private String username;
     private String user_id;
+    private String username;
+
     private String role;
 }

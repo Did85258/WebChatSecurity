@@ -1,4 +1,4 @@
-package webchat.back_end.dto;
+package webchat.back_end.dto.chats;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
