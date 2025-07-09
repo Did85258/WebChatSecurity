@@ -4,7 +4,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import webchat.back_end.dto.auth.UserResponseDTO;
-import webchat.back_end.dto.chats.ImageUploadDTO;
 import webchat.back_end.entity.ChatMessage;
 import webchat.back_end.entity.Images;
 import webchat.back_end.entity.User;
@@ -12,17 +11,11 @@ import webchat.back_end.exception.NotFoundException;
 import webchat.back_end.repository.ChatMessageRepository;
 import webchat.back_end.repository.ImagesRepository;
 import webchat.back_end.repository.UserRepository;
-import webchat.back_end.util.AESUtil;
-import webchat.back_end.util.RSAUtil;
 
-import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.KeyFactory;
-import java.security.PublicKey;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -87,7 +80,7 @@ public class ChatService {
         return chatRepo.save(getChat);
     }
 
-    public Images handleIncomingImage(MultipartFile file, String sender_id, String receiver_id, Instant timestamp, String ivBase64,String aesKeySenderBase64, String aesKeyReceiverBase64) throws IOException {
+    public ChatMessage handleIncomingImage(MultipartFile file, String sender_id, String receiver_id, Instant timestamp, String ivBase64,String aesKeySenderBase64, String aesKeyReceiverBase64) throws IOException {
         ChatMessage getChat = ChatMessage.builder()
                 .sender(sender_id)
                 .receiver(receiver_id)
@@ -112,7 +105,12 @@ public class ChatService {
                 .url_file("images/" + fileName)
                 .messageId(getChat.getId())
                 .build();
-        return imagesRepository.save(getImg);
+        imagesRepository.save(getImg);
+        return getChat;
+    }
+
+    public Optional<ChatMessage> findChatMessage(String message_id){
+        return chatRepo.findById(message_id);
     }
 
     public List<UserResponseDTO> findAllUser() {

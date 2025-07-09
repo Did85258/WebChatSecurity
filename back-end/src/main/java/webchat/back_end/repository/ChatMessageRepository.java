@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 import webchat.back_end.entity.ChatMessage;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ChatMessageRepository extends MongoRepository<ChatMessage, String> {

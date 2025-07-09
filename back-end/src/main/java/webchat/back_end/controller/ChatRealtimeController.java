@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 //@SecurityRequirement(name = "bearerAuth")
 @Controller
@@ -41,12 +42,15 @@ public class ChatRealtimeController {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new RuntimeException("Unauthorized"); // ✅ ปล่อยให้ Spring handle
         }
-//        if(Objects.equals(msg.getType_content(), "0")){
-        ChatMessage chat = chatService.handleIncomingMessage(msg);
-        messagingTemplate.convertAndSend("/topic/messages/" + msg.getReceiver(), chat);
-//        } else if (Objects.equals(msg.getType_content(), "1")) {
-//            ChatMessage chat = chatService.handleIncomingMessage(msg);
-//        }
+        if (Objects.equals(msg.getType_content(), "0")) {
+            ChatMessage chat_message = chatService.handleIncomingMessage(msg);
+            messagingTemplate.convertAndSend("/topic/messages/" + msg.getReceiver(), chat_message);
+        } else if (Objects.equals(msg.getType_content(), "1")) {
+            ChatMessage chat_image = chatService.findChatMessage(msg.getId())
+                    .orElseThrow(() -> new RuntimeException("Message not found"));
+            messagingTemplate.convertAndSend("/topic/messages/" + chat_image.getReceiver(), chat_image);
+        }
+
 
 
         // ✅ ส่งกลับให้ receiver

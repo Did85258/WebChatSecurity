@@ -58,7 +58,7 @@ public class ChatController {
             return ResponseEntity.ok(oldMsg);
 
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Bad Request");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Not Found");
         }
     }
 
@@ -77,8 +77,8 @@ public class ChatController {
                                       @RequestParam("iv") String ivBase64,
                                       @RequestParam("encrypted_aes_key_for_sender") String aesKeySenderBase64,
                                       @RequestParam("encrypted_aes_key_for_receiver") String aesKeyReceiverBase64) throws Exception {
-        Images img = chatService.handleIncomingImage(file, sender_id, receiver_id, timestamp, ivBase64, aesKeySenderBase64,aesKeyReceiverBase64);
-        return ResponseEntity.ok("img");
+        ChatMessage chat = chatService.handleIncomingImage(file, sender_id, receiver_id, timestamp, ivBase64, aesKeySenderBase64,aesKeyReceiverBase64);
+        return ResponseEntity.status(HttpStatus.OK).body(chat.getId());
 
     }
 

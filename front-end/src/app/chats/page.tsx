@@ -12,10 +12,10 @@ import Password from "antd/es/input/Password";
 import { Image } from "antd";
 
 type ChatMessage = {
-  sender: string;
-  receiver: string;
-  content: string;
-  type_content: string;
+  sender?: string;
+  receiver?: string;
+  content?: string;
+  type_content?: string;
   timestamp?: string;
   img_src?: string;
   id?: string;
@@ -105,15 +105,14 @@ const ChatPage = () => {
       );
       const data = await response.json();
       // console.log(data);
+
       if (user) {
-        fetchAndDecryptPrivateKey(user.user_id, "1234").then((key) => {
-          savePrivateKeyToIndexedDB(user.user_id, key);
-        });
+        const key = await fetchAndDecryptPrivateKey(user.user_id, "1234");
+        await savePrivateKeyToIndexedDB(user.user_id, key);
       }
       await Promise.all(
         data.map(async (item: any) => {
           if (item.type_content == "1") {
-            // console.log("9090");
             const img_src = await getImages(item);
             item.img_src = img_src;
           }
@@ -281,12 +280,19 @@ const ChatPage = () => {
 
       onConnect: () => {
         console.log("Connected to WebSocket");
-        console.log(`/topic/messages/${user?.user_id}`);
+        // console.log(`/topic/messages/${user?.user_id}`);
 
-        client.subscribe(`/topic/messages/${user?.user_id}`, (message) => {
-          const msg: ChatMessage = JSON.parse(message.body);
-          setMessages((prev) => [...prev, msg]);
-        });
+        client.subscribe(
+          `/topic/messages/${user?.user_id}`,
+          async (message) => {
+            const msg: ChatMessage = JSON.parse(message.body);
+            if (msg.type_content == "1") {
+              const imgSrc = await getImages(msg); // โหลด + ถอดรหัส
+              msg.img_src = imgSrc;
+            }
+            setMessages((prev) => [...prev, msg]);
+          }
+        );
 
         // Optional: แจ้ง server ว่า user online
         // client.publish({ destination: "/app/chat.addUser", body: JSON.stringify({ from: user }) });
@@ -310,61 +316,52 @@ const ChatPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = () => {
+  const sendMessage = (messageId?: string) => {
+    if (receiverId == "") return;
     if (!stompClientRef.current?.connected) {
       console.warn("WebSocket not connected. Cannot send message.");
       return;
     }
-
-    if (input.trim() === "") return;
-
-    const msg: ChatMessage = {
-      sender: user!.user_id,
-      receiver: receiverId,
-      content: input,
-      type_content: "0",
-      timestamp: thaiISOString(),
+    // console.log(messageId);
+    // console.log(messageId)
+    if (input.trim() === "" && messageId == "") return;
+    let msg: ChatMessage = {
+      sender: "",
+      receiver: "",
+      content: "",
+      type_content: "",
     };
-    // console.log(thaiISOString())
-
-    try {
-      stompClientRef.current.publish({
-        destination: "/app/chat.sent",
-        body: JSON.stringify(msg),
-      });
-      // fetchOldMsgData(reciverId);
-      setMessages((prev) => [...prev, msg]);
-      // console.log(messages);
-      // scrollToBottom();
-      setInput("");
-    } catch (error) {
-      console.error("Error sending message:", error);
-    }
-  };
-
-  const sendImage = (e: any) => {
-    const file = e.target.files[0];
-    if (!file) {
-      alert("Please select a file.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    if (stompClientRef.current && input.trim() !== "") {
-      const msg: ChatMessage = {
+    if (messageId) {
+      msg = {
+        id: messageId,
+        type_content: "1",
+      };
+    } else {
+      msg = {
         sender: user!.user_id,
         receiver: receiverId,
         content: input,
         type_content: "0",
         timestamp: thaiISOString(),
       };
+    }
+
+    // console.log(thaiISOString())
+    // console.log(msg);
+    try {
+      // console.log(msg);
       stompClientRef.current.publish({
-        destination: "/app/image.sent",
+        destination: "/app/chat.sent",
         body: JSON.stringify(msg),
       });
+      // console.log(messageId)
+      // fetchOldMsgData(reciverId);
+      if (msg.type_content == "0") setMessages((prev) => [...prev, msg]);
+      // console.log(messages);
+      // scrollToBottom();
       setInput("");
+    } catch (error) {
+      console.error("Error sending message:", error);
     }
   };
 
@@ -417,6 +414,18 @@ const ChatPage = () => {
       receiverPublicKeyBuf
     );
 
+    const img_url = displayImage(imageBytes);
+    const msg: ChatMessage = {
+      sender: user!.user_id,
+      receiver: receiverId,
+      content: input,
+      type_content: "1",
+      img_src: img_url,
+      timestamp: thaiISOString(),
+    };
+    setMessages((prev) => [...prev, msg]);
+    // console.log(img_url);
+
     // console.log(encryptedAesKey);
 
     // แปลง imageBytes ให้แน่ใจว่าใช้ ArrayBuffer ปกติ
@@ -438,6 +447,7 @@ const ChatPage = () => {
       });
 
       formData.append("file", encryptedBlob, "encrypted_image.enc");
+      formData.append("messageId", user!.user_id);
       formData.append("sender_id", user!.user_id);
       formData.append("receiver_id", receiverId);
       formData.append("timestamp", thaiISOString());
@@ -450,16 +460,25 @@ const ChatPage = () => {
         "encrypted_aes_key_for_receiver",
         btoa(String.fromCharCode(...new Uint8Array(encryptedAesKeyForReceiver)))
       );
-      console.log(formData);
+      // console.log(formData);
       const response = await fetch(`${BASE_URL}/api/sentImg`, {
         method: "POST",
         body: formData,
       });
-      const data = await response.json();
+      // const messagesId = await response.text()
+      if (response.ok) {
+        const messagesId = await response.text();
+        // console.log(messagesId)
+        sendMessage(messagesId);
+      }
+      // const data = await response;
+      // if (data.ok) {
+      //   fetchOldMsgData(receiverId);
+      // }
 
       // setMessages([...data]);
       // scrollToBottom();
-      console.log(data);
+      // console.log(data);
     } catch (error) {
       console.error("Error:", error);
     }
@@ -492,10 +511,6 @@ const ChatPage = () => {
     }
     return copy.buffer;
   }
-  function toBase64(bytes: Uint8Array | ArrayBuffer): string {
-    return btoa(String.fromCharCode(...new Uint8Array(bytes)));
-  }
-
   ////encript
 
   const handleOpenChat = (reciverId: string, reciverName: string) => {
@@ -507,25 +522,27 @@ const ChatPage = () => {
   const fileInputRef: any = useRef(null);
 
   const handleButtonClick = () => {
+    if (receiverId == "") return;
     // คลิกที่ input file โดยอัตโนมัติ
     fileInputRef.current.click();
   };
 
   const handleFileChange = async (e: any) => {
     const file = e.target.files[0];
-    console.log(file);
+    // console.log(file);
     // if (!file) {
     //   alert("Please select a file.");
     //   return;
     // }
     const arrayBuffer = await file.arrayBuffer();
+
     // setImageBytes(new Uint8Array(arrayBuffer));
 
     encryptAndSendImage(new Uint8Array(arrayBuffer));
+    fileInputRef.current.value = "";
   };
 
   ////decrypt img
-  const [imageSrc, setImageSrc] = useState("");
   interface EncryptedImageData {
     file: string; // base64 ของ .enc ไฟล์
     iv: string; // base64
@@ -606,16 +623,14 @@ const ChatPage = () => {
 
     const privateKey = await loadPrivateKeyFromIndexedDB(user!.user_id); // ฟังก์ชันของคุณเอง
 
-    console.log(privateKey);
+    // console.log(privateKey);
     let aesKey;
     if (user?.user_id == message.sender) {
-      console.log("asdsa");
       aesKey = await decryptAESKey(aesKeySenderBase64, privateKey);
-      console.log(aesKeySenderBase64);
-      // console.log("asdsa")
+      // console.log(aesKeySenderBase64);
     } else {
       aesKey = await decryptAESKey(aesKeyReceiverBase64, privateKey);
-      console.log(aesKeyReceiverBase64);
+      // console.log(aesKeyReceiverBase64);
     }
 
     const decryptedImage = await decryptImageData(file, aesKey, iv);
@@ -624,23 +639,7 @@ const ChatPage = () => {
     const imageUrl = displayImage(decryptedImage);
     return imageUrl;
   }
-  // useEffect(() => {
-  //   // console.log("sad");
-  //   async function run() {
-  //     const { file, iv, encrypted_aes_key } = await fetchEncryptedImage();
 
-  //     const privateKey = await loadPrivateKeyFromIndexedDB(); // ฟังก์ชันของคุณเอง
-
-  //     const aesKey = await decryptAESKey(encrypted_aes_key, privateKey);
-  //     const decryptedImage = await decryptImageData(file, aesKey, iv);
-
-  //     const imageUrl = displayImage(decryptedImage);
-
-  //     setImageSrc(imageUrl); // แสดงใน <img src={imageSrc} />
-  //   }
-
-  //   run();
-  // }, [receiverId]);
   ////decrypt img
 
   return (
@@ -687,7 +686,7 @@ const ChatPage = () => {
                       >
                         <div className="flex items-center justify-start flex-row-reverse">
                           <div className="flex text-white items-center justify-center h-10 w-10 rounded-full bg-indigo-500 flex-shrink-0">
-                            {user.username.substring(0, 1).toUpperCase()}
+                            {user?.username.substring(0, 1).toUpperCase()}
                           </div>
                           <div className="relative mr-3 text-sm bg-indigo-100 py-2 px-4 shadow rounded-xl">
                             <div>
@@ -755,7 +754,7 @@ const ChatPage = () => {
               <div className="ml-4">
                 <button
                   className="flex items-center h-8 justify-center bg-indigo-500 hover:bg-indigo-600 rounded-md px-4 py-1 flex-shrink-0"
-                  onClick={sendMessage}
+                  onClick={() => sendMessage()}
                 >
                   <span className="text-white">Send</span>
                   <span className="ml-2 text-white">
