@@ -15,7 +15,11 @@ type ChatMessage = {
   sender?: string;
   receiver?: string;
   content?: string;
+  encrypted_content?: string;
   type_content?: string;
+  iv?: string;
+  encrypted_aes_key_for_sender?: string;
+  encrypted_aes_key_for_receiver?: string;
   timestamp?: string;
   img_src?: string;
   id?: string;
@@ -115,6 +119,9 @@ const ChatPage = () => {
           if (item.type_content == "1") {
             const img_src = await getImages(item);
             item.img_src = img_src;
+          } else {
+            const decryptMessage = await getMessage(item); // โหลด + ถอดรหัส
+            item.content = decryptMessage;
           }
         })
       );
@@ -139,6 +146,7 @@ const ChatPage = () => {
     formData.append("password", password);
     const res = await fetch(`${BASE_URL}/api/private-key`, {
       method: "POST",
+      credentials: "include",
       body: formData,
     });
     const data = await res.json();
@@ -289,6 +297,9 @@ const ChatPage = () => {
             if (msg.type_content == "1") {
               const imgSrc = await getImages(msg); // โหลด + ถอดรหัส
               msg.img_src = imgSrc;
+            } else {
+              const decryptMessage = await getMessage(msg); // โหลด + ถอดรหัส
+              msg.content = decryptMessage;
             }
             setMessages((prev) => [...prev, msg]);
           }
@@ -316,34 +327,23 @@ const ChatPage = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const sendMessage = (messageId?: string) => {
+  const sendMessage = async (messageId?: string) => {
     if (receiverId == "") return;
     if (!stompClientRef.current?.connected) {
       console.warn("WebSocket not connected. Cannot send message.");
       return;
     }
-    // console.log(messageId);
-    // console.log(messageId)
     if (input.trim() === "" && messageId == "") return;
-    let msg: ChatMessage = {
-      sender: "",
-      receiver: "",
-      content: "",
-      type_content: "",
-    };
+
+    let msg: ChatMessage = {};
     if (messageId) {
       msg = {
         id: messageId,
         type_content: "1",
-      };
-    } else {
-      msg = {
-        sender: user!.user_id,
-        receiver: receiverId,
-        content: input,
-        type_content: "0",
         timestamp: thaiISOString(),
       };
+    } else {
+      msg = await encryptMessage(input);
     }
 
     // console.log(thaiISOString())
@@ -356,7 +356,10 @@ const ChatPage = () => {
       });
       // console.log(messageId)
       // fetchOldMsgData(reciverId);
-      if (msg.type_content == "0") setMessages((prev) => [...prev, msg]);
+      if (msg.type_content == "0") {
+        msg.content = input
+        setMessages((prev) => [...prev, msg]);
+      }
       // console.log(messages);
       // scrollToBottom();
       setInput("");
@@ -383,6 +386,86 @@ const ChatPage = () => {
     return crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, aesKey);
   }
 
+  async function fetchPublicKey(receiverId: string): Promise<ArrayBuffer> {
+    const response = await fetch(
+      `${BASE_URL}/api/public-key?userId=${receiverId}`,
+      {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    const publicKeyBuffer = await response.arrayBuffer();
+    console.log(publicKeyBuffer);
+
+    return publicKeyBuffer;
+  }
+
+  async function encryptText(aesKey: Uint8Array, plainText: string) {
+    const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV
+    const aesKeyBuffer = toArrayBuffer(aesKey);
+    const key = await crypto.subtle.importKey(
+      "raw",
+      aesKeyBuffer,
+      "AES-GCM",
+      false,
+      ["encrypt"]
+    );
+    const encoded = new TextEncoder().encode(plainText);
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      encoded
+    );
+    return { ciphertext: new Uint8Array(ciphertext), iv };
+  }
+
+  const encryptMessage = async (plainText: any) => {
+    // ดึง Public Key ของ receiver
+    const publicKeyReceiver = await fetchPublicKey(receiverId);
+
+    const publicKeySender = await fetchPublicKey(user!.user_id);
+
+    const receiverPublicKeyBuf = new Uint8Array(publicKeyReceiver).buffer;
+    const senderPublicKeyBuf = new Uint8Array(publicKeySender).buffer;
+
+    // สุ่ม AES key
+    const aesKey = crypto.getRandomValues(new Uint8Array(16)); // 128-bit
+
+    // เข้ารหัสข้อความด้วย AES key
+    const { ciphertext, iv } = await encryptText(aesKey, plainText);
+
+    // เข้ารหัส AES key ด้วย RSA public key
+    const encryptedAesKeyForSender = await encryptAESKeyWithRSA(
+      aesKey,
+      senderPublicKeyBuf
+    );
+    const encryptedAesKeyForReceiver = await encryptAESKeyWithRSA(
+      aesKey,
+      receiverPublicKeyBuf
+    );
+
+    //ไว้แสดงที่ sender
+    const msg: ChatMessage = {
+      sender: user!.user_id,
+      receiver: receiverId,
+      type_content: "0",
+      encrypted_content: btoa(
+        String.fromCharCode(...new Uint8Array(ciphertext))
+      ), // base64
+      iv: btoa(String.fromCharCode(...iv)),
+      encrypted_aes_key_for_sender: btoa(
+        String.fromCharCode(...new Uint8Array(encryptedAesKeyForSender))
+      ),
+      encrypted_aes_key_for_receiver: btoa(
+        String.fromCharCode(...new Uint8Array(encryptedAesKeyForReceiver))
+      ),
+      timestamp: thaiISOString(),
+    };
+    return msg;
+  };
   const encryptAndSendImage = async (imageBytes: any) => {
     if (!imageBytes) {
       alert("กรุณาเลือกไฟล์ภาพก่อน");
@@ -390,13 +473,9 @@ const ChatPage = () => {
     }
 
     // ดึง Public Key ของ receiver
-    const publicKeyReceiver = await fetch(
-      `${BASE_URL}/api/public-key?userId=${receiverId}`
-    ).then((res) => res.arrayBuffer());
+    const publicKeyReceiver = await fetchPublicKey(receiverId);
 
-    const publicKeySender = await fetch(
-      `${BASE_URL}/api/public-key?userId=${user?.user_id}`
-    ).then((res) => res.arrayBuffer());
+    const publicKeySender = await fetchPublicKey(user!.user_id);
 
     const receiverPublicKeyBuf = new Uint8Array(publicKeyReceiver).buffer;
     const senderPublicKeyBuf = new Uint8Array(publicKeySender).buffer;
@@ -414,6 +493,7 @@ const ChatPage = () => {
       receiverPublicKeyBuf
     );
 
+    //ไว้แสดงที่ sender
     const img_url = displayImage(imageBytes);
     const msg: ChatMessage = {
       sender: user!.user_id,
@@ -428,16 +508,8 @@ const ChatPage = () => {
 
     // console.log(encryptedAesKey);
 
-    // แปลง imageBytes ให้แน่ใจว่าใช้ ArrayBuffer ปกติ
-    const safeImageBytes = new Uint8Array(
-      imageBytes.buffer.slice(
-        imageBytes.byteOffset,
-        imageBytes.byteOffset + imageBytes.byteLength
-      )
-    );
-
     // เข้ารหัสภาพด้วย AES key
-    const encryptedImage = await encryptImage(aesKey, safeImageBytes);
+    const encryptedImage = await encryptImage(aesKey, imageBytes);
     // console.log(encryptedImage);
 
     try {
@@ -451,18 +523,11 @@ const ChatPage = () => {
       formData.append("sender_id", user!.user_id);
       formData.append("receiver_id", receiverId);
       formData.append("timestamp", thaiISOString());
-      formData.append("iv", btoa(String.fromCharCode(...encryptedImage.iv))); // Uint8Array → base64 string
-      formData.append(
-        "encrypted_aes_key_for_sender",
-        btoa(String.fromCharCode(...new Uint8Array(encryptedAesKeyForSender)))
-      );
-      formData.append(
-        "encrypted_aes_key_for_receiver",
-        btoa(String.fromCharCode(...new Uint8Array(encryptedAesKeyForReceiver)))
-      );
+
       // console.log(formData);
       const response = await fetch(`${BASE_URL}/api/sentImg`, {
         method: "POST",
+        credentials: "include",
         body: formData,
       });
       // const messagesId = await response.text()
@@ -484,7 +549,7 @@ const ChatPage = () => {
     }
   };
 
-  async function encryptImage(aesKey: Uint8Array, imageBytes: Uint8Array) {
+  async function encryptImage(aesKey: Uint8Array, imageBytes: ArrayBuffer) {
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const aesKeyBuffer = toArrayBuffer(aesKey);
     const cryptoKey = await crypto.subtle.importKey(
@@ -495,11 +560,12 @@ const ChatPage = () => {
       ["encrypt"]
     );
 
-    const safeBuffer = toArrayBuffer(imageBytes);
+    // const safeBuffer = toArrayBuffer(imageBytes);
+    console.log("it's ok");
     const encryptedBuffer = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv: iv },
       cryptoKey,
-      safeBuffer
+      imageBytes
     );
 
     return { iv, ciphertext: new Uint8Array(encryptedBuffer) };
@@ -550,13 +616,10 @@ const ChatPage = () => {
     aesKeyReceiverBase64: string; // base64
   }
 
-  async function fetchEncryptedImage(id: string): Promise<EncryptedImageData> {
+  async function fetchImage(id: string): Promise<EncryptedImageData> {
     const res = await fetch(`${BASE_URL}/api/getImg?message_id=${id}`, {
       method: "GET",
-      // credentials: "include",
-      // headers: {
-      //   "Content-Type": "application/json",
-      // },
+      credentials: "include",
     });
 
     return res.json();
@@ -584,7 +647,7 @@ const ChatPage = () => {
 
     return new Uint8Array(decryptedKeyBuffer);
   }
-  async function decryptImageData(
+  async function decryptData(
     encryptedB64: string,
     aesKey: Uint8Array,
     ivB64: string
@@ -618,26 +681,66 @@ const ChatPage = () => {
   }
 
   async function getImages(message: ChatMessage) {
-    const { file, iv, aesKeySenderBase64, aesKeyReceiverBase64 } =
-      await fetchEncryptedImage(message.id!);
+    const { file } = await fetchImage(message.id!);
 
     const privateKey = await loadPrivateKeyFromIndexedDB(user!.user_id); // ฟังก์ชันของคุณเอง
 
     // console.log(privateKey);
     let aesKey;
     if (user?.user_id == message.sender) {
-      aesKey = await decryptAESKey(aesKeySenderBase64, privateKey);
+      aesKey = await decryptAESKey(
+        message.encrypted_aes_key_for_sender!,
+        privateKey
+      );
       // console.log(aesKeySenderBase64);
     } else {
-      aesKey = await decryptAESKey(aesKeyReceiverBase64, privateKey);
+      aesKey = await decryptAESKey(
+        message.encrypted_aes_key_for_receiver!,
+        privateKey
+      );
       // console.log(aesKeyReceiverBase64);
     }
 
-    const decryptedImage = await decryptImageData(file, aesKey, iv);
+    const decryptedImage = await decryptData(file, aesKey, message.iv!);
     // console.log(decryptedImage)
 
     const imageUrl = displayImage(decryptedImage);
     return imageUrl;
+  }
+
+  async function getMessage(message: ChatMessage) {
+    const privateKey = await loadPrivateKeyFromIndexedDB(user!.user_id); // ฟังก์ชันของคุณเอง
+
+    // console.log(privateKey);
+    let aesKey;
+    if (user?.user_id == message.sender) {
+      aesKey = await decryptAESKey(
+        message.encrypted_aes_key_for_sender!,
+        privateKey
+      );
+      // console.log(aesKeySenderBase64);
+    } else {
+      aesKey = await decryptAESKey(
+        message.encrypted_aes_key_for_receiver!,
+        privateKey
+      );
+      // console.log(aesKeyReceiverBase64);
+    }
+    const decryptedMesssage = await decryptData(
+      message.encrypted_content!,
+      aesKey,
+      message.iv!
+    );
+    // console.log(decryptedMesssage);
+
+    const decryptedText = decryptedBytesToString(decryptedMesssage);
+
+    return decryptedText;
+  }
+
+  function decryptedBytesToString(decryptedBytes: Uint8Array): string {
+    const decoder = new TextDecoder(); // ใช้ "utf-8" เป็น default
+    return decoder.decode(decryptedBytes);
   }
 
   ////decrypt img
@@ -653,13 +756,15 @@ const ChatPage = () => {
                 <span className="font-bold">People message</span>
               </div>
               <div className="flex flex-col space-y-1 mt-4 -mx-2 h overflow-y-auto mr-2">
-                {usersData.map((row, index) => (
-                  <ChoseUser
-                    key={index}
-                    userName={row.username}
-                    onClick={() => handleOpenChat(row.user_id, row.username)}
-                  />
-                ))}
+                {usersData
+                  .filter((row) => row.user_id !== user?.user_id)
+                  .map((row, index) => (
+                    <ChoseUser
+                      key={index}
+                      userName={row.username}
+                      onClick={() => handleOpenChat(row.user_id, row.username)}
+                    />
+                  ))}
               </div>
             </div>
           </div>

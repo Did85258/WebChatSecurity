@@ -1,26 +1,41 @@
+version: '3.8'
 services:
-
   backend:
-    build: ./back-end
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    working_dir: /app
     ports:
       - "8080:8080"
-    environment:
-      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/chatdb
-      - SPRING_DEVTOOLS_RESTART_ENABLED=true
     volumes:
       - ./back-end:/app
-    working_dir: /app
-    command: ./gradlew bootRun
     depends_on:
       - mongo
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/secure-chat
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./front-end:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    environment:
+      - CHOKIDAR_USEPOLLING=true
 
   mongo:
-    image: mongo:latest
-    container_name: chat-mongo
+    image: mongo:6
+    container_name: mongodb
     ports:
       - "27017:27017"
     volumes:
-      - mongo-data:/data/db
+      - mongodb_data:/data/db
 
 volumes:
-  mongo-data:
+  mongodb_data:

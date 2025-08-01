@@ -1,0 +1,36 @@
+# # 1. ใช้ Gradle image ที่มี Java แล้ว
+# FROM gradle:8.5-jdk17-alpine AS build
+
+# # 2. สร้าง working directory
+# WORKDIR /app
+
+# # 3. คัดลอกโค้ดทั้งหมดไป
+# COPY back-end /app
+
+# # 4. สร้าง .jar (ไม่ต้อง run server ในขั้นนี้)
+# RUN gradle bootJar
+
+# # 5. สร้าง container ใหม่สำหรับ run จริง
+# FROM openjdk:17-jdk-slim
+
+# WORKDIR /app
+
+# # 6. คัดลอก .jar ที่สร้างจาก build stage มา
+# COPY --from=build /app/build/libs/*.jar app.jar
+
+# # 7. สั่งรันแอป
+# CMD ["java", "-jar", "app.jar"]
+
+
+FROM eclipse-temurin:21-jdk
+
+WORKDIR /app
+
+COPY back-end/ .
+
+RUN ./gradlew --no-daemon build || true
+
+EXPOSE 8080
+
+CMD ["./gradlew", "bootRun"]
+

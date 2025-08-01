@@ -73,8 +73,11 @@ public class ChatService {
         ChatMessage getChat = ChatMessage.builder()
                 .sender(req_chat.getSender())
                 .receiver(req_chat.getReceiver())
-                .content(req_chat.getContent())
+                .encrypted_content(req_chat.getEncrypted_content())
                 .type_content(req_chat.getType_content())
+                .encrypted_aes_key_for_sender(req_chat.getEncrypted_aes_key_for_sender())
+                .encrypted_aes_key_for_receiver(req_chat.getEncrypted_aes_key_for_receiver())
+                .iv(req_chat.getIv())
                 .timestamp(req_chat.getTimestamp())
                 .build();
         return chatRepo.save(getChat);
@@ -86,6 +89,9 @@ public class ChatService {
                 .receiver(receiver_id)
                 .content("")
                 .type_content("1")
+                .encrypted_aes_key_for_sender(aesKeySenderBase64)
+                .encrypted_aes_key_for_receiver(aesKeyReceiverBase64)
+                .iv(ivBase64)
                 .timestamp(timestamp)
                 .build();
         chatRepo.save(getChat);
@@ -99,9 +105,6 @@ public class ChatService {
 
 
         Images getImg = Images.builder()
-                .iv(ivBase64)
-                .aesKeySenderBase64(aesKeySenderBase64)
-                .aesKeyReceiverBase64(aesKeyReceiverBase64)
                 .url_file("images/" + fileName)
                 .messageId(getChat.getId())
                 .build();

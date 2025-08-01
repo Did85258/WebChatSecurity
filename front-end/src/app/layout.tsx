@@ -1,4 +1,4 @@
-import { Geist, Geist_Mono } from "next/font/google";
+
 import "./globals.css";
 import { UserProvider, useUser } from "../components/context/UserContext";
 import "antd/dist/reset.css";
@@ -7,15 +7,7 @@ import Navbar from "@/components/navbar/Navbar";
 
 
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export default function RootLayout({
   children,
@@ -25,12 +17,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* <link
-          href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css"
-          rel="stylesheet"
-        /> */}
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter&display=swap" />
+        <meta httpEquiv="Cache-Control" content="no-store" />
       </head>
-
       <body>
         <UserProvider>
           <AntdRegistry>
