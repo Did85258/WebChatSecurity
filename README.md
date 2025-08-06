@@ -30,4 +30,13 @@ A secure real-time web chat application focused on **data privacy** and **end-to
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/839452ee-9143-4cd7-a001-ecf191ecf2dd" />
 
 
+## 📸 Demo
+<img width="1920" height="873" alt="image" src="https://github.com/user-attachments/assets/519675a2-c705-4764-a1dd-94c19dd29f80" />
+<img width="1919" height="863" alt="image" src="https://github.com/user-attachments/assets/8b9a7e0d-4d11-4551-9824-ef2d911b1cbf" />
+<img width="1920" height="857" alt="image" src="https://github.com/user-attachments/assets/c1ab7842-df49-48e5-b3d1-85c359f45138" />
+
+
+
+
+
 
