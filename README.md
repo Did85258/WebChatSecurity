@@ -21,7 +21,7 @@ A secure real-time web chat application focused on **data privacy** and **end-to
 
 ---
 
-## 📁 Project Structure
+## 📁 System Overview
 
 ### Encrypt
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/617348af-30f4-43d9-baac-994b4ba9a0d3" />
