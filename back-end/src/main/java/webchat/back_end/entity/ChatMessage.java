@@ -26,7 +26,7 @@ public class ChatMessage {
     private String encrypted_aes_key_for_sender;
     private String encrypted_aes_key_for_receiver;
     private String iv;
-    private Instant timestamp;
+    private Instant timestamp;//
 
 
 }
